@@ -1,0 +1,7 @@
+@echo off
+
+
+ echo javacc ParserICL.jj
+ javac ICLInterpreter.java
+ java ICLInterpreter
+ pause

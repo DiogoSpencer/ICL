@@ -1,0 +1,4 @@
+{let x = new -2 in
+  let y= new 10 in
+   let z = 7 in
+ while ~(!x == z) do y := !y+1; x := !x+1 end; print !y};;

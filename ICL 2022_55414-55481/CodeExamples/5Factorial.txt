@@ -1,0 +1,10 @@
+{let number=5 in 
+  let indice=new 2 in 
+    let res=new 1 in
+        while !indice <= number do res := !res * !indice; indice := !indice + 1 end; print !res};;
+
+
+
+
+
+

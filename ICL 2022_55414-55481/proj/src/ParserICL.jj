@@ -1,0 +1,288 @@
+PARSER_BEGIN(ParserICL)
+
+
+
+import Ast.*;
+import java.util.*;
+
+/** ID lister. */
+public class ParserICL {
+}
+
+PARSER_END(ParserICL)
+
+SKIP :
+{
+  " "
+| "\t"
+| "\r"
+}
+
+TOKEN :
+{
+  < Num: (["0"-"9"]) + >
+  |
+  < PLUS : "+" >
+  |
+  < MINUS : "-">
+  |
+  < TIMES : "*">
+  |
+  < DIV : "/">
+  |
+  < LPAR : "(" >
+  |
+  < RPAR : ")" >
+  |
+  < EL: "\n" >
+  |
+  < LET: "let">
+  |
+  < EQUALS: "=">
+  |
+  < LBRACK: "{">
+  |
+  < RBRACK: "}">
+  |
+  < SEMICOLON: ";">
+  |
+  < IF: "if">
+  |
+  < THEN : "then" >
+  |
+  < END: "end">
+  |
+  < ELSE : "else" >
+  |
+  < WHILE : "while" >
+  |
+  < DO : "do" >
+  |
+  < TRUE : "true" >
+  |
+  < FALSE : "false" >
+  |
+  < NEW : "new" >
+  |
+  < PRINT : "print" >
+  |
+  < NOT : "~" >
+  |
+  <DEREF : "!" >
+  |
+  < IN : "in" >
+  |
+  < GT : ">" >
+  |
+  < ST : "<" >
+  |
+  < GTE : ">=" >
+  |
+  < STE : "<=" >
+  |
+  < IEQ : "==" >
+  |
+  <ASSIGN : ":=">
+  |
+  < OR : "||" >
+  |
+  < AND : "&&" >
+  |
+  < Id: ["a"-"z","A"-"Z"] ( ["a"-"z","A"-"Z","0"-"9"] )* >
+  |
+  <ENDP: ";;">
+
+
+
+
+
+}
+
+ASTNode Start():
+{ ASTNode t; }
+{
+  t = Exp() <EL>
+  { return t; }
+
+//( t = Exp() <ENDP> { return t; } | <EOF> { return null; } )
+
+}
+
+ASTNode Exp() :
+{
+  ASTNode t1, t2;
+}
+{
+
+
+  	t1=Assign() (<SEMICOLON> t2=Assign() { t1 = new ASTSeq(t1,t2); })*
+  	{ return t1; }
+
+
+}
+
+
+ASTNode Assign():
+{
+
+    ASTNode t1, t2;
+}
+
+{
+	t1=BoolOr() (<ASSIGN> t2=BoolOr() { t1 = new ASTAssign(t1,t2); } )*
+	{ return t1; }
+}
+
+ASTNode BoolOr() :
+{
+	ASTNode t1, t2;
+}
+{
+	t1=BoolAnd() (<OR> t2=BoolAnd() { t1 = new ASTOr(t1, t2); } )*
+	{ return t1; }
+}
+
+ASTNode BoolAnd() :
+{
+	ASTNode t1, t2;
+}
+{
+	t1=Relop() (<AND> t2=Relop() { t1 = new ASTAnd(t1, t2); } )*
+
+	{ return t1; }
+}
+
+ASTNode Relop() :
+{
+	ASTNode t1, t2;
+	Token n;
+}
+{
+	t1=IntAdd() ( (n=<GT> | n=<ST> | n=<GTE> | n=<STE> | n=<IEQ>) t2=IntAdd() { t1 = new ASTRelop(t1, n.image, t2); } )?
+
+	{ return t1; }
+}
+
+
+ASTNode IntAdd() :
+{
+	ASTNode t1,t2;
+	Token n;
+}
+{
+	t1=Term() ( ( n=<PLUS> | n=<MINUS> ) t2=Term()
+                     { if (n.kind == PLUS)
+                             t1 = new ASTPlus(t1,t2);
+                       else  t1 = new ASTSub(t1,t2);
+                     }
+                   ) *
+         { return t1; }
+
+}
+
+
+
+ASTNode Term() :
+{Token n;
+  ASTNode t1, t2;}
+{
+     t1 = Fact() ( ( n=<TIMES> | n=<DIV> ) t2 = Term()
+ 		 { if (n.kind == TIMES)
+                                    t1 = new ASTTimes(t1,t2);
+                              else  t1 = new ASTDiv(t1,t2);
+                 } 
+		)?
+     { return t1; } 
+}
+
+
+ASTNode Fact() :
+{ Token n; 
+  ASTNode t;
+  Map<String, ASTNode> map = new LinkedHashMap<String,ASTNode>();
+
+
+  }
+{
+   (
+    n=<Num> { t = new ASTNum(Integer.parseInt(n.image)); } |
+    <TRUE> { t = new ASTBool(true); } |
+    <FALSE> { t = new ASTBool(false); } |
+    n = <Id> { t = new ASTId(n.image); } |
+    <MINUS> t = Fact() {t = new ASTNeg(t);} |
+    <LPAR> t=Exp() <RPAR> |
+    <NOT> t=Fact() { t = new ASTNegBool(t); } |
+    <NEW> t=Fact() { t = new ASTNew(t); } |
+    <DEREF> t=Fact() { t = new ASTDeref(t); } |
+    <PRINT> t=Fact() { t = new ASTPrint(t); } |
+    t = Definition() |
+    t = Conditional() |
+    t = While()
+
+   )
+   { return t; }
+}
+
+
+
+ASTNode Conditional() :
+{
+	ASTNode cond, t1, t2;
+}
+{
+	<IF> cond=Exp() <THEN> (<EL>)* t1=Exp() <ELSE> (<EL>)* t2=Exp() (<EL>)* <END> { t1 = new ASTIf(cond, t1, t2); }         //exp ta mal
+	{ return t1; }
+}
+
+
+ASTNode While() :
+{
+	ASTNode cond, t1;
+}
+{
+	<WHILE> cond=Exp() <DO> (<EL>)*  t1=Exp() (<EL>)* <END> { t1 = new ASTWhile(cond, t1); }                     //exp ta mal
+	{ return t1; }
+}
+
+ASTNode Definition() :
+{
+  Token n;
+  ASTNode t, t1;
+  Map<String, ASTNode> map = new LinkedHashMap<String,ASTNode>();
+}
+
+{  // (
+   //    <LBRACK> (<LET> n= <Id> <EQUALS> t = Exp() {map.put(n.image, t);})+ <IN> (<EL>)* t1 = Exp() <RBRACK> <ENDP>
+  //  )
+  // {return new ASTDef(map,t1);}
+
+
+   <LBRACK> ((<LET> n=<Id> <EQUALS> t=Exp() <IN> (<EL>)* {map.put(n.image, t);}) )+ t=Exp() <RBRACK> <ENDP>
+
+   { return new ASTDef(map, t);}
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
